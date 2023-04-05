@@ -5,10 +5,6 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": true
   },
-  "workbench.colorCustomizations": {
-    "titleBar.activeBackground": "#8FCE0B",
-    "titleBar.inactiveBackground": "#4B5A30"
-  },
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
