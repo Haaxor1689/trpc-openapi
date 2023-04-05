@@ -1,7 +1,7 @@
+import { extendApi, generateSchema } from '@anatine/zod-openapi';
 import { TRPCError } from '@trpc/server';
 import { OpenAPIV3 } from 'openapi-types';
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
 
 import { OpenApiContentType } from '../types';
 import {
@@ -15,10 +15,8 @@ import {
   zodSupportsCoerce,
 } from '../utils/zod';
 
-const zodSchemaToOpenApiSchemaObject = (zodSchema: z.ZodType): OpenAPIV3.SchemaObject => {
-  // FIXME: https://github.com/StefanTerdell/zod-to-json-schema/issues/35
-  return zodToJsonSchema(zodSchema, { target: 'openApi3', $refStrategy: 'none' }) as any;
-};
+const generate = (zodSchema: z.ZodType): OpenAPIV3.SchemaObject =>
+  generateSchema(zodSchema) as never;
 
 export const getParameterObjects = (
   schema: unknown,
@@ -99,7 +97,9 @@ export const getParameterObjects = (
         shapeSchema = shapeSchema.unwrap();
       }
 
-      const { description, ...openApiSchemaObject } = zodSchemaToOpenApiSchemaObject(shapeSchema);
+      const { description, ...openApiSchemaObject } = generate(
+        extendApi(shapeSchema, (shape[shapeKey]! as any).metaOpenApi),
+      );
 
       return {
         name: shapeKey,
@@ -144,7 +144,7 @@ export const getRequestBodyObject = (
   });
   const dedupedSchema = unwrappedSchema.omit(mask);
 
-  const openApiSchemaObject = zodSchemaToOpenApiSchemaObject(dedupedSchema);
+  const openApiSchemaObject = generate(extendApi(dedupedSchema, (schema as any).metaOpenApi));
   const content: OpenAPIV3.RequestBodyObject['content'] = {};
   for (const contentType of contentTypes) {
     content[contentType] = {
@@ -162,12 +162,19 @@ export const errorResponseObject = {
   description: 'Error response',
   content: {
     'application/json': {
-      schema: zodSchemaToOpenApiSchemaObject(
-        z.object({
-          message: z.string(),
-          code: z.string(),
-          issues: z.array(z.object({ message: z.string() })).optional(),
-        }),
+      schema: generate(
+        extendApi(
+          z.object({
+            message: z.string(),
+            code: z.string(),
+            issues: z.array(z.object({ message: z.string() })).optional(),
+          }),
+          {
+            title: 'TRPCError',
+            description:
+              'For more info see [https://trpc.io/docs/server/error-handling](https://trpc.io/docs/server/error-handling)',
+          },
+        ),
       ),
     },
   },
@@ -185,7 +192,7 @@ export const getResponsesObject = (schema: unknown): OpenAPIV3.ResponsesObject =
     description: 'Successful response',
     content: {
       'application/json': {
-        schema: zodSchemaToOpenApiSchemaObject(schema),
+        schema: generate(schema),
       },
     },
   };
